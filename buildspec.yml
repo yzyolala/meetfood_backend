@@ -1,0 +1,31 @@
+version: 0.2
+
+# 可选。使用前置操作来安装项目中所需的依赖
+phases:
+  install:
+    runtime-versions:  # 指定运行时版本
+      nodejs: 18
+    commands:
+      - echo "installing packages..."
+      - echo "Packages installed successfully"
+
+  pre_build:
+    commands:
+      - echo "Testing..."
+      - echo "Tests passed successfully."
+
+  build:
+    commands:
+      - echo "Starting compiling packages....."
+      - echo "Build passed successfully."
+
+  post_build:
+    commands:
+      - echo "Performing post-build packing and operations..."
+      - echo "Post build successfully."
+
+# 可选。定义构建输出的文件或目录
+artifacts:
+  files:
+    - '**/*'
+  name: meetfoodclasscode
