@@ -1,3 +1,6 @@
+// This line must come before importing any instrumented module.
+// eslint-disable-next-line
+const tracer = require('dd-trace').init();
 const express = require('express');
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
@@ -14,8 +17,6 @@ const videoRoutes = require('./routes/videopost');
 
 const app = express();
 
-// This line must come before importing any instrumented module.
-const tracer = require('dd-trace').init();
 
 const MAX_RATE = 2000;
 

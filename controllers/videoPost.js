@@ -4,6 +4,8 @@ const fs = require('fs');
 const AWS_S3 = require('../util/aws-s3');
 const { getFileBaseName } = require('../util/path');
 const s3 = AWS_S3.setS3Credentials;
+const mongoose = require('mongoose');
+
 
 //a function to get page and size,which used for pagination
 const getPagination=(page,size)=>{
@@ -81,7 +83,7 @@ exports.postComment=async(req,res)=>{
     //3.push comment into videopost comment array
     try{
 
-        const post=await VideoPost.findbyId(req.params.videoPostId);
+        const post=await VideoPost.findById(req.params.videoPostId);
         const user=await User.findById(req.userId);
 
         const newComment={
@@ -114,45 +116,37 @@ exports.postComment=async(req,res)=>{
  *
  * @apiError Sever Error 500
  */
+exports.deleteComment = async (req, res) => {
+  try {
+    const post = await VideoPost.findById(req.params.videoPostId);
+    const comment = post.comments.find(
+      (comment) => comment.id === req.params.commentId,
+    );
 
-exports.deleteComment=async(req,res)=>{
-    //1.check if comment exists
-    //2.check if comment is written by current user
-    //3.delete the comment
-    //4.save and return
-    try{
-        const post=await VideoPost.findById(req.params.videoPostId);
-
-        if(!videoPost){
-            return res.status(404).json({
-                msg:'Cannot find the video with this videoPostId.',
-            });
-        }
-
-        const comment=post.comments.find(
-            (comment)=>comment.id === req.params.commentId,
-        );
-        //check if comment exists
-        if(!comment){
-            return res.status(404).json({msg:'Comment does not exist.'});
-        }
-        //how to delete an element in js array
-        //array method:splice
-        //get the removeIndex
-        const removeIndex=post.comments
-            .map((comment)=>comment.id)
-            .indexOf(req.params.commentId);
-
-        post.comments.splice(removeIndex,1);
-        post.countComment=post.comments.length;
-
-        await post.save();
-
-        res.sendStatus(200);
-    }catch(err){
-        res.status(500).json({ err: err.message});
+    // Check if the comment exists
+    if (!comment) {
+      return res.status(404).json({ msg: 'Comment does not exist.' });
     }
-}
+
+    // Check if the comment is wroten by the user
+    if (comment.user.toString() !== req.userId.toString()) {
+      return res.status(401).json({ msg: 'The user is not authorized.' });
+    }
+    // Get the removeIndex
+    const removeIndex = post.comments
+      .map((comment) => comment.id)
+      .indexOf(req.params.commentId);
+
+    post.comments.splice(removeIndex, 1);
+    post.countComment = post.comments.length;
+    await post.save();
+
+    res.sendStatus(200);
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).send('Server Error');
+  }
+};
 
 /**
  * @api {get} /api/v1/video/videos     Get VideoPosts
@@ -432,94 +426,92 @@ exports.uploadCoverImage = async (req, res) => {
  * @apiSuccess  return video url as well as the updated user object
  * @apiError Sever Error 500 with error message
  */
-
 exports.createVideoPost = async (req, res) => {
-    // // Request body validation通过req.checkBody方法，它检查请求体中的字段是否符合要求。
-    //例如，它检查postTitle、imageUrl、videoUrl和restaurantName字段是否存在且不为空。
-    req
-      .checkBody('postTitle')
-      .exists()
-      .withMessage('post Title is required')
-      .notEmpty()
-      .withMessage('post Title is required');
-    req
-      .checkBody('imageUrl')
-      .exists()
-      .withMessage('imageUrl is required')
-      .notEmpty()
-      .withMessage('Empty URL');
-    req
-      .checkBody('videoUrl')
-      .exists()
-      .withMessage('videoUrl is required')
-      .notEmpty()
-      .withMessage('Empty URL');
-    req
-      .checkBody('restaurantName')
-      .notEmpty()
-      .withMessage('Restaurant name should not be empty');
-  
-    const errors = req.validationErrors();
-    if (errors || errors.length > 0) {
-      return res.status(400).json({ errors: errors });
+  // // Request body validation
+  req
+    .checkBody('postTitle')
+    .exists()
+    .withMessage('post Title is required')
+    .notEmpty()
+    .withMessage('post Title is required');
+  req
+    .checkBody('imageUrl')
+    .exists()
+    .withMessage('imageUrl is required')
+    .notEmpty()
+    .withMessage('Empty URL');
+  req
+    .checkBody('videoUrl')
+    .exists()
+    .withMessage('videoUrl is required')
+    .notEmpty()
+    .withMessage('Empty URL');
+  req
+    .checkBody('restaurantName')
+    .notEmpty()
+    .withMessage('Restaurant name should not be empty');
+
+  const errors = req.validationErrors();
+  if (errors || errors.length > 0) {
+    return res.status(400).json({ errors: errors });
+  }
+
+  const {
+    postTitle,
+    imageUrl,
+    videoUrl,
+    restaurantName,
+    restaurantAddress,
+    orderedVia,
+  } = req.body;
+
+  try {
+    // Check if the user exists
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res
+        .status(400)
+        .json({ errors: [{ msg: 'Can not find the user.' }] });
     }
-    //从请求体（req.body）中解构出需要的参数，
-    //包括帖子的标题（postTitle）、封面图片的URL（imageUrl）、视频的URL（videoUrl）、餐厅名称（restaurantName）、餐厅地址（restaurantAddress）和获取方式（orderedVia）。
-    const {
-      postTitle,
-      imageUrl,
-      videoUrl,
-      restaurantName,
-      restaurantAddress,
-      orderedVia,
-    } = req.body;
-  
-    try {
-      // Check if the user exists
-      const user = await User.findById(req.userId);
-      if (!user) {
-        return res
-          .status(400)
-          .json({ errors: [{ msg: 'Can not find the user.' }] });
-      }
-    // 启动一个Mongoose会话。Mongoose是一个MongoDB的对象模型工具，用于在Node.js中操作MongoDB数据库。  
-    const session = await mongoose.startSession();  
-    
-    // 在会话中创建一个新的视频帖子，并将其保存到数据库中。  
-    // 帖子的内容包括用户ID、帖子标题、封面图片URL、餐厅名称、餐厅地址、获取方式、视频URL和发帖时间。  
-    await session.withTransaction(async () => {  
-        const videoPost = new VideoPost({  
-        userId: user.id,  
-        postTitle: postTitle,  
-        coverImageUrl: imageUrl,  
-        restaurantName: restaurantName,  
-        restaurantAddress: restaurantAddress,  
-        orderedVia: orderedVia,  
-        videoUrl: videoUrl,  
-        postTime: new Date().toISOString(),  
-        }); 
-  
-        await videoPost.save();
-  
+
+    const session = await mongoose.startSession();
+
+    let videoPost;
+    await session
+      .withTransaction(async () => {
+        videoPost = new VideoPost({
+          userId: user.id,
+          postTitle: postTitle,
+          coverImageUrl: imageUrl,
+          restaurantName: restaurantName,
+          restaurantAddress: restaurantAddress,
+          orderedVia: orderedVia,
+          videoUrl: videoUrl,
+          postTime: new Date().toISOString(),
+        });
+
+        videoPost = await videoPost.save();
+
         user.videos.push({ videoPost: videoPost._id });
         await user.save();
-    }).catch((err) => {
-          session.endSession();
-          console.log(err.message);
-        });
-  
-      session.endSession();
-  
-      return res.status(200).json({
-        message: 'Video post is created successfully',
-        videoPost,
+      })
+      .catch((err) => {
+        session.endSession();
+        console.log(err.message);
       });
-    } catch (err) {
-      res
-        .status(500)
-        .json({ msg: 'Failed to create video post', err: err.message });
-    }
-  };
+
+    session.endSession();
+
+    return res.status(200).json({
+      message: 'Video post is created successfully',
+      videoPost,
+    });
+  } catch (err) {
+    res
+      .status(500)
+      .json({ msg: 'Failed to create video post', err: err.message });
+  }
+};
 
 /**
  * @api {delete} /api/v1/video/customer/:videoPostId    DeleteVideoPost
