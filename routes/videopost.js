@@ -26,4 +26,7 @@ router.post('/new',isToCCognitoAuthenticated,videoPostController.createVideoPost
 // 删除客户发布的指定ID的视频帖子
 router.delete('/customer/:videoPostId',isToCCognitoAuthenticated,videoPostController.deleteCustomerVideoPost);
 
+// Upload a new video file
+router.post('/upload',isToCCognitoAuthenticated,upload.single('video-content'),videoPostController.uploadVideo);
+
 module.exports=router;                                     // 导出路由模块，使其他文件可以使用这些路由设置

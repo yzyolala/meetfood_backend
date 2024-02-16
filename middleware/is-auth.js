@@ -30,7 +30,7 @@ function isToCCognitoAuthenticated(req, res, next) {
   // 验证 token
   cognitoExpressToC.validate(token, async function (err, response) {
     // 如果验证失败，则返回错误
-    if (err) return res.status(401).json({ err });
+    if (err) return res.status(401).json({ err:err.massage });
 
     // 验证成功，继续执行
     req.userSub = response.sub; // 设置请求对象的 userSub 属性

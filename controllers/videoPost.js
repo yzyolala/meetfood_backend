@@ -480,7 +480,7 @@ exports.createVideoPost = async (req, res) => {
     await session
       .withTransaction(async () => {
         videoPost = new VideoPost({
-          userId: user.id,
+          userId: user.Id,
           postTitle: postTitle,
           coverImageUrl: imageUrl,
           restaurantName: restaurantName,
@@ -602,5 +602,60 @@ exports.deleteCustomerVideoPost = async (req, res) => {
       res.status(500).json({ err: err.message });
     }
   };
+
+  /**
+ * @api {post} /api/v1/video/upload    Upload Video to AWS
+ * @apiName Upload Video file to AWS
+ * @apiGroup VideoPost
+ * @apiDescription ToC use | update a single video file
+ *
+ * @apiBody {File} binary video File   the video to upload
+ *
+ * @apiSuccess  return video url that is stored on AWS
+ * @apiError Sever Error 500 with error message
+ */
+exports.uploadVideo = async (req, res) => {
+  try {
+    // Check if the user exists
+    const user = await User.findById(req.userId);
+
+    if (!user) {
+      return res
+        .status(400)
+        .json({ errors: [{ msg: 'Can not find the user.' }] });
+    }
+    // Upload the video file
+    let videoUrl;
+    const videoParams = AWS_S3.s3CustomerVideoParams(req);
+    const videoStored = await s3
+      .upload(videoParams, (err) => {
+        // Check error
+        if (err) {
+          return res.status(500).json({
+            errors: [
+              {
+                msg: 'Error occured while trying to upload video to S3 bucket',
+                err,
+              },
+            ],
+          });
+        }
+      })
+      .promise();
+
+    // Empty uploads folder
+    fs.unlinkSync(req.file.path);
+
+    const videoFileName = getFileBaseName(videoStored.Location);
+    videoUrl = AWS_S3.videoUrlGenerator(videoFileName);
+
+    return res.status(200).json({
+      message: 'Video is uploaded successfully',
+      videoUrl,
+    });
+  } catch (err) {
+    res.status(500).json({ msg: 'Failed to upload video', err: err.message });
+  }
+};
   
   

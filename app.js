@@ -8,6 +8,8 @@ const config = require('./config/production');
 const port = process.env.PORT || 3000;
 var cors = require('cors');
 const rateLimit = require('express-rate-limit');
+const expressValidator = require('express-validator');
+
 
 mongoose.set('debug', true);
 
@@ -39,6 +41,8 @@ app.use(
   }),
 );
 app.use(bodyParser.urlencoded({ extended: false }));
+
+app.use(expressValidator());
 
 // Add routers
 app.use('/api/v1/user', userRoutes);
